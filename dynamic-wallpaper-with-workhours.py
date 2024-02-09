@@ -35,9 +35,14 @@ parser.add_argument(
 )
 parser.add_argument(
     "-work",
-    "--is-working-time",
+    "--force-work-mode",
     help="force to use working theme",
     action="store_true",
+)
+parser.add_argument(
+    "-s",
+    "--set-mode-for-today",
+    choices=["work", "normal", "clear"],
 )
 
 args = parser.parse_args()
@@ -70,6 +75,36 @@ now = datetime.datetime.now()
 is_weekday = now.weekday() <= 4
 is_working_hour = 8 <= now.hour <= 18
 
+work_mode = is_weekday and is_working_hour
+
+# try to see if user had set a preference for today
+pref_fname = f"/tmp/{THIS_FILE.name}.{now.strftime('%Y-%m-%d')}"
+
+
+if args.set_mode_for_today == "clear":
+    try:
+        os.remove(pref_fname)
+    except FileNotFoundError:
+        pass
+
+elif args.set_mode_for_today:
+    with open(pref_fname, "w") as f:
+        f.write(args.set_mode_for_today)
+
+try:
+    with open(pref_fname, "r") as f:
+        cur_mode = f.read()
+    if cur_mode == "work":
+        work_mode = True
+    elif cur_mode == "normal":
+        work_mode = False
+except FileNotFoundError:
+    # no today preference
+    pass
+
+if args.force_work_mode:
+    work_mode = True
+
 
 def get_file(path: Path, name: str):
     return next(path.glob(f"{name}.*"))
@@ -79,7 +114,7 @@ def set_wallpaper(filename: str):
     subprocess.check_output([PYWAL, "-i", filename])
 
 
-if args.is_working_time or (is_weekday and is_working_hour):
+if work_mode:
     set_wallpaper(get_file(ROOT_PATH, args.wallpaper_name))
 else:
     set_wallpaper(get_file(ROOT_PATH / args.theme_folder, now.hour))
